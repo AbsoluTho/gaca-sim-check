@@ -181,6 +181,12 @@ table.lt td.v.wrap{white-space:normal;min-width:180px}
 .fc{position:relative;min-height:260px;border:1px solid var(--line);background:var(--surface);cursor:pointer;display:flex;flex-direction:column;padding:18px 18px 16px;gap:12px;user-select:none;-webkit-user-select:none}
 .fc .k{display:flex;justify-content:space-between;gap:10px;font:500 12px var(--f-mono);color:var(--ink3)}
 .fc .k b{color:var(--accent);font-weight:500;text-transform:uppercase;letter-spacing:.04em}
+.lfront{display:flex;flex-direction:column;gap:6px;font:600 24px/1.15 var(--f-display);letter-spacing:.03em;text-transform:uppercase;text-wrap:balance}
+.lfront .l1{color:var(--accent)}
+.lfront .l2{color:var(--ink2)}
+.lfront .l3{color:var(--ink)}
+.lfront em{font-style:normal;color:var(--warn);white-space:nowrap}
+@media (max-width:480px){.lfront{font-size:21px}}
 .fc .front{font:600 26px/1.15 var(--f-display);letter-spacing:.02em;text-transform:uppercase;text-wrap:balance}
 .fc .front.q{font:500 19px/1.4 var(--f-body);text-transform:none;letter-spacing:0}
 .fc .back{border-top:2px solid var(--accent);padding-top:12px;display:flex;flex-direction:column;gap:8px}
@@ -3410,6 +3416,25 @@ function limCards(){
     (g.cards||[]).forEach(([q,ti],ci)=>out.push({id:`${si}.${gi}.t${ci}`,sec:s.sec,g:g.t,label:q,text:g.text[ti]}));
   })});return out;
 }
+/* What the answer measures (altitude, temperature, pressure...), shown after the item name on the card front. */
+function limKind(c){
+  const g=c.g.toLowerCase(),l=c.label.toLowerCase(),v=(c.vals&&c.vals[0]||'').toLowerCase();
+  if(c.text)return 'DEFINITION';
+  const by={'load acceleration':'LOAD FACTOR','weight':'WEIGHT','minimum control speeds (altitude 0 ft)':'SPEED','avionics ventilation':'TIME LIMIT','minimum height for autopilot':'HEIGHT','rnp accuracy with gps primary':'ACCURACY','maximum wind for cat ii or iii':'WIND','apu operational envelope':'ALTITUDE','thrust setting and egt limits':'EGT TEMPERATURE','shaft speeds':'ROTOR SPEED','oil temperature':'TEMPERATURE','oil pressure':'PRESSURE','oil quantity':'QUANTITY','flex temperature':'TEMPERATURE','fuel temperature':'TEMPERATURE','fuel imbalance at takeoff':'MAX IMBALANCE','fuel imbalance in flight and at landing':'MAX IMBALANCE','minimum fuel for takeoff':'QUANTITY','fuel on board difference after refueling':'MAX DIFFERENCE','hydraulic':'PRESSURE','landing gear':'TEMPERATURE','air bleed/cond/press/vent':'LIMITATION','passenger and cargo doors operation':'WIND SPEED'};
+  if(g==='wind')return l==='tailwind'?'MAX TAILWIND':'MAX CROSSWIND';
+  if(g==='maximum wind for cat ii or iii')return 'MAX '+l.toUpperCase();
+  if(g==='speeds')return v.includes('ft')?'ALTITUDE':'SPEED';
+  if(g==='operational parameters')return l.includes('slope')?'SLOPE':l.includes('width')?'WIDTH':'ALTITUDE';
+  if(g==='cabin pressure')return v.includes('psi')?'PRESSURE':'CABIN ALTITUDE';
+  if(g==='automatic landing')return l.includes('angle')?'ANGLE':l.includes('elevation')?'ELEVATION':l==='weight'?'WEIGHT':'PRESSURE ALTITUDE';
+  if(g==='apu starter')return v.includes('%')?'SPEED':'EGT TEMPERATURE';
+  if(g==='starter')return l.includes('pause')?'TIME':l.includes('cooling')?'NUMBER OF CYCLES':'N2 SPEED';
+  if(g==='taxi speeds and nosewheel steering')return l.includes('angle')?'ANGLE':'MAX TAXI SPEED';
+  if(g==='oxygen')return l.includes('smoke')?'PROTECTION':'DURATION';
+  if(by[g])return by[g];
+  if(/°c/.test(v))return 'TEMPERATURE';if(/psi/.test(v))return 'PRESSURE';if(/kg/.test(v))return 'WEIGHT';if(/ kt|mach/.test(v))return 'SPEED';if(/ ft/.test(v))return 'ALTITUDE';
+  return 'VALUE';
+}
 function limTable(g){
   if(g.text)return `<div class="ltext">${g.text.map(t=>'<p>'+esc(t)+'</p>').join('')}</div>`;
   const cols=g.cols||[''];const multi=!!g.cols;
@@ -3423,7 +3448,7 @@ function renderLim(){
   }else{
     const cards=limCards();
     body=`<div class="ctl" style="margin-bottom:12px"><span class="lbl">Sections in the deck</span><div class="chips">${LIMITS.map((s,si)=>`<button class="chip" data-limsec="${si}" aria-pressed="${st.lim.secs.includes(si)}">${esc(s.sec)}</button>`).join('')}<button class="chip" data-limsec="all" aria-pressed="${!st.lim.secs.length}">All</button></div></div>`+
-    fcHtml('lim',cards,c=>`<div class="k"><b>${esc(c.sec)}</b><span>${esc(c.g)}</span></div><div class="front">${esc(c.label)}</div>`,
+    fcHtml('lim',cards,c=>`<div class="lfront"><span class="l1">${esc(c.sec)}</span><span class="l2">${esc(c.g)}</span><span class="l3">${c.lead&&c.label!=='tailwind'?esc(c.lead)+' ':''}${esc(c.label)}${(k=>c.label.toUpperCase().includes(k)?'':` <em>${esc(k)}</em>`)(limKind(c))}</span></div>`,
       c=>c.text?`<div class="val txt">${esc(c.text)}</div>`:(c.vals.length>1||c.cols)?`<div class="kv">${c.vals.map((v,i)=>`<span>${esc((c.cols||[])[i]||'')}</span><b>${esc(v)}</b>`).join('')}</div>`:`<div class="val">${esc(c.vals[0])}</div>`);
   }
   main.innerHTML=`<div class="mhead"><span class="eyebrow">Airbus A320 — Limitations (Feb 26)</span><h1>Limitations</h1></div>
