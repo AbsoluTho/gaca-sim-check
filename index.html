@@ -198,6 +198,30 @@ table.lt td.v.wrap{white-space:normal;min-width:180px}
 .fc .hint{margin-top:auto;font:500 12px var(--f-mono);color:var(--ink3)}
 .fc .back img{border:1px solid var(--line);background:#fff}
 .fc.flipped{border-color:var(--accent)}
+.fc .hist{position:absolute;right:12px;bottom:8px;font:500 11px var(--f-mono);color:var(--ink3)}
+.fcset{display:flex;flex-wrap:wrap;gap:12px 18px;align-items:flex-end;margin-bottom:14px}
+.btn.ans{flex:1 1 140px;min-height:52px;font-size:18px}
+.btn.ok{background:var(--ok-soft);border-color:var(--ok);color:var(--ok)}
+.btn.bad{background:var(--bad-soft);border-color:var(--bad);color:var(--bad)}
+.ansrow{flex:1 1 100%}
+.okc{color:var(--ok)}.badc{color:var(--bad)}
+.scores{margin-top:18px;border:1px solid var(--line);background:var(--surface);max-width:720px}
+.scores>summary{cursor:pointer;list-style:none;display:flex;justify-content:space-between;gap:12px;padding:10px 12px;font:600 14px var(--f-display);letter-spacing:.08em;text-transform:uppercase;color:var(--ink2)}
+.scores>summary::-webkit-details-marker{display:none}
+.scores>summary b{font:500 13px var(--f-mono);letter-spacing:0;text-transform:none;color:var(--ink)}
+.sbox{display:flex;flex-direction:column;gap:2px;padding:0 12px 12px}
+.srow{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(60px,1fr) 44px;gap:4px 10px;align-items:center;padding:6px 0;border-bottom:1px dashed var(--line)}
+.srow .sg{font-size:13px;min-width:0;overflow-wrap:anywhere}
+.srow .sbar{height:8px;background:var(--sunk);border-radius:4px;overflow:hidden}
+.srow .sbar i{display:block;height:100%;background:var(--ink3)}
+.srow .sbar i.ok{background:var(--ok)}.srow .sbar i.mid{background:var(--warn)}.srow .sbar i.bad{background:var(--bad)}
+.srow .sp{font:600 13px var(--f-mono);text-align:right;font-variant-numeric:tabular-nums}
+.srow .sn{grid-column:1/-1;font:400 11px var(--f-mono);color:var(--ink3)}
+.fcdone{display:flex;flex-direction:column;gap:8px;padding:16px;border:1px solid var(--line);background:var(--surface);max-width:720px}
+.fcdone b{font:700 48px/1 var(--f-display)}
+.fcdone b.ok{color:var(--ok)}.fcdone b.mid{color:var(--warn)}.fcdone b.bad{color:var(--bad)}
+.fcdone .lbl{font:600 12px var(--f-display);letter-spacing:.1em;text-transform:uppercase;color:var(--ink3)}
+.fcdone .sbox{padding:0}
 .fcbar{display:flex;gap:10px;flex-wrap:wrap;justify-content:space-between;align-items:center}
 .prog{height:4px;background:var(--sunk);position:relative}
 .prog i{position:absolute;inset:0 auto 0 0;background:var(--accent)}
@@ -3384,34 +3408,69 @@ function renderMem(){
   <details style="margin-top:16px"><summary class="muted" style="cursor:pointer">Management of abnormal operations (PC check guide page)</summary><div class="pages" style="margin-top:8px"><img src="img/pc/g32.jpg" alt="Management of abnormal operations" loading="lazy"></div></details>`;
 }
 
-/* ================= FLASHCARD ENGINE ================= */
+/* ================= FLASHCARD ENGINE =================
+   Every deck (lim, sys, opc) shares this. Answers marked ✓/✗ are kept per card in st.score[deck][cardId]={r,w},
+   saved on this device. A test is a shuffled run of N cards (20/30/50/all) from the selected groups, either from
+   all cards or from the most-missed ones. */
 const decks={};
-function deck(name,cards){
-  let d=decks[name];
-  const sig=cards.map(c=>c.id).join('|');
-  if(!d||d.sig!==sig){d=decks[name]={sig,order:shuffle(cards.map((_,i)=>i)),pos:0,flip:false,again:0}}
-  return d;
+const scoreOf=(name,id)=>((st.score||{})[name]||{})[id]||{r:0,w:0};
+function deckOpts(name){st.fcopt=st.fcopt||{};return st.fcopt[name]=st.fcopt[name]||{n:20,src:'all'}}
+function missedIdx(name,cards){return cards.map((c,i)=>i).filter(i=>scoreOf(name,cards[i].id).w>0).sort((a,b)=>{const A=scoreOf(name,cards[a].id),B=scoreOf(name,cards[b].id);return (B.w-B.r)-(A.w-A.r)||(B.w/(B.r+B.w))-(A.w/(A.r+A.w))})}
+function buildOrder(name,cards){const o=deckOpts(name);const lim=o.n==='all'?Infinity:+o.n;
+  if(o.src==='missed')return shuffle(missedIdx(name,cards).slice(0,lim));
+  return shuffle(cards.map((c,i)=>i)).slice(0,lim)}
+function deck(name,cards){let d=decks[name];const sig=cards.map(c=>c.id).join('|')+'#'+JSON.stringify(deckOpts(name));
+  if(!d||d.sig!==sig){d=decks[name]={sig,order:buildOrder(name,cards),pos:0,flip:false,res:{},cards}}d.cards=cards;return d}
+function scoresHtml(name,all,grpOf){
+  const groups=[];const gmap={};all.forEach(c=>{const g=grpOf(c);if(!gmap[g]){gmap[g]={g,n:0,ans:0,r:0,w:0,miss:0};groups.push(gmap[g])}const s=scoreOf(name,c.id),x=gmap[g];x.n++;if(s.r+s.w){x.ans++;x.r+=s.r;x.w+=s.w}if(s.w>0)x.miss++});
+  const tot=groups.reduce((a,x)=>({r:a.r+x.r,w:a.w+x.w,ans:a.ans+x.ans,n:a.n+x.n}),{r:0,w:0,ans:0,n:0});
+  const pct=x=>x.r+x.w?Math.round(x.r/(x.r+x.w)*100):null;
+  const row=(x,label)=>{const p=pct(x);return `<div class="srow"><span class="sg">${esc(label)}</span><span class="sbar"><i style="width:${p||0}%" class="${p==null?'':p>=80?'ok':p>=60?'mid':'bad'}"></i></span><span class="sp">${p==null?'—':p+'%'}</span><span class="sn">${x.ans}/${x.n} seen${x.miss?` · ${x.miss} missed`:''}</span></div>`};
+  const d=decks[name]||{};
+  return `<details class="scores" ${st.scoresOpen&&st.scoresOpen[name]?'open':''} data-scores="${name}"><summary><span>Your score</span><b>${pct(tot)==null?'No answers yet':pct(tot)+'% correct'}</b></summary><div class="sbox">${groups.map(x=>row(x,x.g)).join('')}
+   <div class="row" style="margin-top:8px">${d.resetAsk?`<span class="muted" style="font-size:13px">Erase all scores for this deck?</span><button class="btn sm" data-fcact="resetno" data-deck="${name}">Keep</button><button class="btn sm bad" data-fcact="resetyes" data-deck="${name}">Erase</button>`:`<button class="btn sm" data-fcact="resetask" data-deck="${name}">Reset scores</button>`}</div></div></details>`;
 }
-function fcHtml(name,cards,frontFn,backFn){
-  if(!cards.length)return '<p class="lnote">Pick at least one section.</p>';
-  const d=deck(name,cards);const c=cards[d.order[d.pos]];
-  return `<div class="fc-wrap"><div class="prog"><i style="width:${(d.pos/cards.length*100).toFixed(1)}%"></i></div>
-   <div class="fc ${d.flip?'flipped':''}" data-fc="${name}" tabindex="0" role="button" aria-label="Flashcard, tap to flip">${frontFn(c)}${d.flip?`<div class="back">${backFn(c)}</div>`:'<span class="hint">Tap to flip</span>'}</div>
-   <div class="fcbar"><span class="muted" style="font:500 12px var(--f-mono)">Card ${d.pos+1} of ${cards.length}</span><div class="row"><button class="btn sm" data-fcact="prev" data-deck="${name}" ${d.pos===0?'disabled':''}>Back</button><button class="btn sm" data-fcact="again" data-deck="${name}">Again later</button><button class="btn sm primary" data-fcact="next" data-deck="${name}">Next card</button><button class="btn sm" data-fcact="shuffle" data-deck="${name}">Shuffle</button></div></div></div>`;
+function fcHtml(name,cards,frontFn,backFn,all,grpOf){
+  all=all||cards;grpOf=grpOf||(c=>c.sec);
+  const o=deckOpts(name);const d=deck(name,cards);const nMiss=missedIdx(name,cards).length;
+  const setup=`<div class="fcset">
+    <div class="ctl"><span class="lbl">Questions per test</span><div class="seg">${[20,30,50,'all'].map(n=>`<button data-fcn="${n}" data-deck="${name}" aria-pressed="${o.n==n}">${n==='all'?'All':n}</button>`).join('')}</div></div>
+    <div class="ctl"><span class="lbl">Which cards</span><div class="seg"><button data-fcsrc="all" data-deck="${name}" aria-pressed="${o.src!=='missed'}">All cards</button><button data-fcsrc="missed" data-deck="${name}" aria-pressed="${o.src==='missed'}">Most missed (${nMiss})</button></div></div>
+    <button class="btn sm" data-fcact="restart" data-deck="${name}">New test</button></div>`;
+  const sc=scoresHtml(name,all,grpOf);
+  if(!d.order.length)return setup+`<p class="lnote">${o.src==='missed'?'No missed cards here yet. Answers you mark with ✗ will show up in this list.':'Pick at least one section.'}</p>`+sc;
+  const nr=Object.values(d.res).filter(x=>x==='r').length,nw=Object.values(d.res).filter(x=>x==='w').length;
+  if(d.pos>=d.order.length){
+    const p=nr+nw?Math.round(nr/(nr+nw)*100):0;const wrong=d.order.filter(i=>d.res[cards[i].id]==='w');
+    const per={};d.order.forEach(i=>{const c=cards[i],g=grpOf(c),r=d.res[c.id];if(!r)return;per[g]=per[g]||{r:0,w:0};per[g][r]++});
+    return setup+`<div class="fcdone"><span class="lbl">Test complete</span><b class="${p>=80?'ok':p>=60?'mid':'bad'}">${p}%</b><span>${nr} correct · ${nw} incorrect${d.order.length-nr-nw?` · ${d.order.length-nr-nw} skipped`:''}</span>
+      <div class="sbox">${Object.entries(per).map(([g,x])=>`<div class="srow"><span class="sg">${esc(g)}</span><span class="sbar"><i style="width:${Math.round(x.r/(x.r+x.w)*100)}%" class="${x.r/(x.r+x.w)>=.8?'ok':x.r/(x.r+x.w)>=.6?'mid':'bad'}"></i></span><span class="sp">${Math.round(x.r/(x.r+x.w)*100)}%</span><span class="sn">${x.r}/${x.r+x.w}</span></div>`).join('')}</div>
+      <div class="row">${wrong.length?`<button class="btn sm primary" data-fcact="retry" data-deck="${name}">Retry the ${wrong.length} I missed</button>`:''}<button class="btn sm" data-fcact="restart" data-deck="${name}">New test</button></div></div>`+sc;
+  }
+  const c=cards[d.order[d.pos]];const s=scoreOf(name,c.id);
+  return setup+`<div class="fc-wrap"><div class="prog"><i style="width:${(d.pos/d.order.length*100).toFixed(1)}%"></i></div>
+   <div class="fc ${d.flip?'flipped':''}" data-fc="${name}" tabindex="0" role="button" aria-label="Flashcard, tap to flip">${frontFn(c)}${d.flip?`<div class="back">${backFn(c)}</div>`:'<span class="hint">Tap to see the answer</span>'}${s.r+s.w?`<span class="hist">Before: ✓ ${s.r} · ✗ ${s.w}</span>`:''}</div>
+   <div class="fcbar"><span class="muted" style="font:500 12px var(--f-mono)">Card ${d.pos+1} of ${d.order.length} · <span class="okc">✓ ${nr}</span> · <span class="badc">✗ ${nw}</span></span>
+   ${d.flip?`<div class="row ansrow"><button class="btn ans bad" data-fcact="wrong" data-deck="${name}">✗ Incorrect</button><button class="btn ans ok" data-fcact="right" data-deck="${name}">✓ Correct</button></div>`
+   :`<div class="row"><button class="btn sm" data-fcact="prev" data-deck="${name}" ${d.pos===0?'disabled':''}>Back</button><button class="btn sm" data-fcact="skip" data-deck="${name}">Skip</button><button class="btn sm primary" data-fcact="flip" data-deck="${name}">Show answer</button></div>`}</div></div>`+sc;
 }
-function fcAct(name,act,len){
-  const d=decks[name];if(!d)return;
+function fcAct(name,act){
+  const d=decks[name];if(!d)return;const cards=d.cards;
   if(act==='flip')d.flip=!d.flip;
-  else if(act==='next'){if(d.pos<len-1){d.pos++;}else{d.order=shuffle(d.order);d.pos=0}d.flip=false}
+  else if(act==='right'||act==='wrong'){const c=cards[d.order[d.pos]];const k=act==='right'?'r':'w';st.score=st.score||{};const m=st.score[name]=st.score[name]||{};const s=m[c.id]=m[c.id]||{r:0,w:0};s[k]++;d.res[c.id]=k;d.pos++;d.flip=false;save()}
+  else if(act==='skip'){d.pos++;d.flip=false}
   else if(act==='prev'){if(d.pos>0)d.pos--;d.flip=false}
-  else if(act==='again'){const cur=d.order.splice(d.pos,1)[0];const at=Math.min(d.order.length,d.pos+3+Math.floor(Math.random()*4));d.order.splice(at,0,cur);d.flip=false;if(d.pos>=len)d.pos=0}
-  else if(act==='shuffle'){d.order=shuffle(d.order);d.pos=0;d.flip=false}
+  else if(act==='restart'){delete decks[name]}
+  else if(act==='retry'){d.order=shuffle(d.order.filter(i=>d.res[cards[i].id]==='w'));d.pos=0;d.res={};d.flip=false}
+  else if(act==='resetask')d.resetAsk=true;
+  else if(act==='resetno')d.resetAsk=false;
+  else if(act==='resetyes'){if(st.score)delete st.score[name];save();delete decks[name]}
 }
 
 /* ================= LIMITATIONS ================= */
-function limCards(){
+function limCards(all){
   const out=[];
-  LIMITS.forEach((s,si)=>{if(st.lim.secs.length&&!st.lim.secs.includes(si))return;s.groups.forEach((g,gi)=>{
+  LIMITS.forEach((s,si)=>{if(!all&&st.lim.secs.length&&!st.lim.secs.includes(si))return;s.groups.forEach((g,gi)=>{
     (g.rows||[]).forEach((r,ri)=>out.push({id:`${si}.${gi}.${ri}`,sec:s.sec,g:g.t,lead:g.lead,label:r[0],vals:r.slice(1),cols:g.cols}));
     (g.cards||[]).forEach(([q,ti],ci)=>out.push({id:`${si}.${gi}.t${ci}`,sec:s.sec,g:g.t,label:q,text:g.text[ti]}));
   })});return out;
@@ -3449,7 +3508,7 @@ function renderLim(){
     const cards=limCards();
     body=`<div class="ctl" style="margin-bottom:12px"><span class="lbl">Sections in the deck</span><div class="chips">${LIMITS.map((s,si)=>`<button class="chip" data-limsec="${si}" aria-pressed="${st.lim.secs.includes(si)}">${esc(s.sec)}</button>`).join('')}<button class="chip" data-limsec="all" aria-pressed="${!st.lim.secs.length}">All</button></div></div>`+
     fcHtml('lim',cards,c=>`<div class="lfront"><span class="l1">${esc(c.sec)}</span><span class="l2">${esc(c.g)}</span><span class="l3">${c.lead&&c.label!=='tailwind'?esc(c.lead)+' ':''}${esc(c.label)}${(k=>c.label.toUpperCase().includes(k)?'':` <em>${esc(k)}</em>`)(limKind(c))}</span></div>`,
-      c=>c.text?`<div class="val txt">${esc(c.text)}</div>`:(c.vals.length>1||c.cols)?`<div class="kv">${c.vals.map((v,i)=>`<span>${esc((c.cols||[])[i]||'')}</span><b>${esc(v)}</b>`).join('')}</div>`:`<div class="val">${esc(c.vals[0])}</div>`);
+      c=>c.text?`<div class="val txt">${esc(c.text)}</div>`:(c.vals.length>1||c.cols)?`<div class="kv">${c.vals.map((v,i)=>`<span>${esc((c.cols||[])[i]||'')}</span><b>${esc(v)}</b>`).join('')}</div>`:`<div class="val">${esc(c.vals[0])}</div>`,limCards(true),c=>c.sec);
   }
   main.innerHTML=`<div class="mhead"><span class="eyebrow">Airbus A320 — Limitations (Feb 26)</span><h1>Limitations</h1></div>
   <div class="toolbar"><div class="ctl"><span class="lbl">View</span><div class="seg"><button data-limview="list" aria-pressed="${v==='list'}">All limitations</button><button data-limview="cards" aria-pressed="${v==='cards'}">Flashcards</button></div></div></div>${body}`;
@@ -3464,7 +3523,7 @@ function renderSys(){
   }else if(v==='cards'){
     const cards=[];SYS.forEach((c,ci)=>{if(st.sys.chs.length&&!st.sys.chs.includes(ci))return;c.qa.forEach((q,qi)=>cards.push({id:ci+'.'+qi,ch:c.t,sec:c.sec,q:q[0],a:q[1]}))});
     body=`<div class="ctl" style="margin-bottom:12px"><span class="lbl">Panels in the deck</span><div class="chips">${SYS.map((c,ci)=>`<button class="chip" data-sysch2="${ci}" aria-pressed="${st.sys.chs.includes(ci)}">${esc(c.t.replace(/\s+ATA.*$/,''))}</button>`).join('')}<button class="chip" data-sysch2="all" aria-pressed="${!st.sys.chs.length}">All</button></div></div>`+
-    fcHtml('sys',cards,c=>`<div class="k"><b>${esc(c.ch)}</b><span>${esc(c.sec)}</span></div><div class="front q">${esc(c.q)}</div>`,c=>`<div class="val txt">${esc(c.a)}</div>`);
+    fcHtml('sys',cards,c=>`<div class="k"><b>${esc(c.ch)}</b><span>${esc(c.sec)}</span></div><div class="front q">${esc(c.q)}</div>`,c=>`<div class="val txt">${esc(c.a)}</div>`,(()=>{const a=[];SYS.forEach((c,ci)=>c.qa.forEach((q,qi)=>a.push({id:ci+'.'+qi,ch:c.t})));return a})(),c=>c.ch.replace(/\s+ATA.*$/,''));
   }else{
     const z=st.sys.zoom||3;const tips=st.sys.tips!==false;
     body=`<div class="toolbar"><div class="ctl"><span class="lbl">Memory tips</span><div class="seg"><button data-tips="1" aria-pressed="${tips}">Show buttons</button><button data-tips="0" aria-pressed="${!tips}">Hide</button></div></div><div class="ctl"><span class="lbl">Zoom</span><div class="seg"><button data-zoom="1" aria-pressed="${z==1}">Fit</button><button data-zoom="2" aria-pressed="${z==2}">2×</button><button data-zoom="3" aria-pressed="${z==3}">3×</button><button data-zoom="4.5" aria-pressed="${z==4.5}">4.5×</button></div></div></div>
@@ -3504,7 +3563,7 @@ function renderOpc(){
   const cards=OPC.map((o,i)=>({id:'o'+i,n:i+1,...o})).filter(c=>!sel.length||sel.includes(c.sec));
   const chips=`<div class="ctl" style="margin-bottom:12px"><span class="lbl">Topics</span><div class="chips">${secs.map(x=>`<button class="chip" data-opcsec="${esc(x)}" aria-pressed="${sel.includes(x)}">${esc(x)}</button>`).join('')}<button class="chip" data-opcsec="all" aria-pressed="${!sel.length}">All</button></div></div>`;
   if(v==='cards'){
-    body=chips+fcHtml('opc',cards,c=>`<div class="k"><b>${esc(c.sec)}</b><span>Question ${c.n}</span></div><div class="front q">${esc(c.q)}</div>`,c=>`<div class="rich">${c.a}</div>`);
+    body=chips+fcHtml('opc',cards,c=>`<div class="k"><b>${esc(c.sec)}</b><span>Question ${c.n}</span></div><div class="front q">${esc(c.q)}</div>`,c=>`<div class="rich">${c.a}</div>`,OPC.map((o,i)=>({id:'o'+i,sec:o.sec})),c=>c.sec);
   }else{
     body=chips+`<div class="qa">${cards.map(c=>`<details><summary><span class="qn">${c.n}</span><span>${esc(c.q)}</span></summary><div class="ans rich">${c.a}</div></details>`).join('')}</div>`;
   }
@@ -3553,8 +3612,11 @@ main.addEventListener('click',e=>{
   if((b=t.closest('[data-opcsec]'))){const v=b.dataset.opcsec;st.opc.secs=st.opc.secs||[];if(v==='all')st.opc.secs=[];else{const k=st.opc.secs.indexOf(v);k>=0?st.opc.secs.splice(k,1):st.opc.secs.push(v)}save();renderOpc();return}
   if((b=t.closest('[data-zoom]'))){st.sys.zoom=+b.dataset.zoom;save();renderSys();return}
   if((b=t.closest('[data-opcview]'))){st.opc.view=b.dataset.opcview;save();renderOpc();return}
-  if((b=t.closest('[data-fcact]'))){const n=b.dataset.deck;fcAct(n,b.dataset.fcact,deckLen(n));rerenderDeck(n);return}
-  if((b=t.closest('[data-fc]'))){const n=b.dataset.fc;fcAct(n,'flip',deckLen(n));rerenderDeck(n);return}
+  if((b=t.closest('[data-fcact]'))){const n=b.dataset.deck;fcAct(n,b.dataset.fcact);rerenderDeck(n);return}
+  if((b=t.closest('[data-fcn]'))){const n=b.dataset.deck;deckOpts(n).n=b.dataset.fcn==='all'?'all':+b.dataset.fcn;save();delete decks[n];rerenderDeck(n);return}
+  if((b=t.closest('[data-fcsrc]'))){const n=b.dataset.deck;deckOpts(n).src=b.dataset.fcsrc;save();delete decks[n];rerenderDeck(n);return}
+  if(t.closest('.scores>summary'))return;
+  if((b=t.closest('[data-fc]'))){const n=b.dataset.fc;if(!decks[n].flip){fcAct(n,'flip');rerenderDeck(n)}return}
 });
 main.addEventListener('keydown',e=>{const b=e.target.closest('[data-fc]');if(b&&(e.key===' '||e.key==='Enter')){e.preventDefault();b.click()}});
 function deckLen(n){return decks[n]?decks[n].order.length:0}
@@ -3563,6 +3625,7 @@ main.addEventListener('change',e=>{const c=e.target.closest('[data-fms]');if(!c)
 main.addEventListener('toggle',e=>{
   const d=e.target;
   if(d.id==='flowdet'){st.flowOpen=d.open;save()}
+  if(d.dataset&&d.dataset.scores){st.scoresOpen=st.scoresOpen||{};st.scoresOpen[d.dataset.scores]=d.open;save()}
   if(d.classList&&d.classList.contains('ex')&&d.open){st.fmsOpen=d.dataset.ex;save()}
   const lz=d.open&&d.querySelector(':scope > .pages[data-lazy]');
   if(lz&&!lz.dataset.done){lz.innerHTML=lz.dataset.lazy.split(',').map(p=>`<img src="img/sys/p${String(p).padStart(2,'0')}.jpg" alt="Systems guide page ${p}" loading="lazy">`).join('');lz.dataset.done=1}
