@@ -143,6 +143,8 @@ img{max-width:100%;height:auto;display:block}
 .next{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;padding:12px;border:1px solid var(--line);border-top:0;background:var(--sunk)}
 .next .lft{font:500 12px var(--f-mono);color:var(--ink2)}
 .next.end{background:var(--ok-soft);color:var(--ok)}
+.colhd.one{grid-template-columns:1fr}
+.colhd.one div{display:block!important}
 .colhd.crew{position:sticky;top:calc(env(safe-area-inset-top,0px) + 44px);z-index:3}
 .colhd .lb{display:block}
 .colhd .nt{display:block;font:400 11px var(--f-body);letter-spacing:0;text-transform:none;color:var(--ink3)}
@@ -368,7 +370,7 @@ const MANS=[
       "trig": false
      },
      {
-      "l": "<p>“I have control, I have communication, no relevant OEB, ECAM actions”</p>",
+      "l": "<p>“No relevant OEB, ECAM actions”</p>",
       "r": "<p>“NEW START IN PROGRESS” (The FADEC will make three new start attempts)</p>",
       "trig": false
      },
@@ -414,11 +416,6 @@ const MANS=[
      {
       "l": "",
       "r": "<p>“ECAM Actions Complete”</p>",
-      "trig": false
-     },
-     {
-      "l": "<p>“I have Control, You have Communication”</p>",
-      "r": "",
       "trig": false
      },
      {
@@ -1269,11 +1266,6 @@ const MANS=[
       "trig": false
      },
      {
-      "l": "<p>“I have control, I have communication”</p>",
-      "r": "",
-      "trig": false
-     },
-     {
       "l": "<p>(Push to level off) and then (V/S +500 and Pull)</p>",
       "r": "",
       "trig": false
@@ -1367,11 +1359,6 @@ const MANS=[
       "trig": false
      },
      {
-      "l": "<p>“I have Control, You have Communication”</p>",
-      "r": "",
-      "trig": false
-     },
-     {
       "l": "<p>“Call Jeddah Approach, we are ready to resume climb”</p>",
       "r": "<p>“Jeddah Approach, ADEAL 320, Ready to resume climb”</p>",
       "trig": false
@@ -1413,11 +1400,6 @@ const MANS=[
      {
       "l": "",
       "r": "<p>“ECAM Actions Complete”- (PM turns right dome light OFF)</p>",
-      "trig": false
-     },
-     {
-      "l": "<p>“I have Control, You have Communication”</p>",
-      "r": "",
       "trig": false
      },
      {
@@ -1591,11 +1573,6 @@ const MANS=[
       "trig": false
      },
      {
-      "l": "<p>“I have control, I have communication”</p>",
-      "r": "",
-      "trig": false
-     },
-     {
       "l": "<p>(Push to level off) and then (V/S +500 and Pull)</p>",
       "r": "",
       "trig": false
@@ -1689,11 +1666,6 @@ const MANS=[
      {
       "l": "",
       "r": "<p>“ECAM Actions Complete”- (PM turns dome light OFF)</p>",
-      "trig": false
-     },
-     {
-      "l": "<p>“I have Control, You have Communication”</p>",
-      "r": "",
       "trig": false
      },
      {
@@ -1885,11 +1857,6 @@ const MANS=[
      {
       "f": "<p>Quick analysis: FCU, FMA, aircraft position relative to the surroundings, and ECAM upper and lower displays.</p>",
       "trig": false
-     },
-     {
-      "l": "<p>“I have control. I have communication.”</p>",
-      "r": "",
-      "trig": false
      }
     ]
    },
@@ -2075,20 +2042,22 @@ const MANS=[
     "h": "Phase 5 Transfer of duties and QRH setup"
    },
    {
+    "t": "trig",
+    "h": "<b>The pilot being checked performs all the performance and speed calculations (QRH, FlySmart and FMS) from this point.</b>"
+   },
+   {
     "t": "tbl",
     "cols": [
-     "CA",
-     "FO\nOr CM1 / CA for GACA check"
+     "Pilot being checked",
+     ""
     ],
     "rows": [
      {
-      "l": "",
-      "r": "<p>“You have control and communications.”<br>“I will get the QRH LANDING WITH SLATS OR FLAPS JAMMED procedure.”</p>",
+      "f": "<p>“You have control and communications.”<br>“I will get the QRH LANDING WITH SLATS OR FLAPS JAMMED procedure.”</p>",
       "trig": false
      },
      {
-      "l": "",
-      "r": "<p>On reading the first line, “LDG DIST PROC: APPLY”, pause the checklist at that item to complete Phase 6.</p>",
+      "f": "<p>On reading the first line, “LDG DIST PROC: APPLY”, pause the checklist at that item to complete Phase 6.</p>",
       "trig": false
      }
     ]
@@ -2100,18 +2069,20 @@ const MANS=[
    {
     "t": "tbl",
     "cols": [
-     "CA",
-     "FO\nOr CM1 / CA for GACA check"
+     "Pilot being checked",
+     ""
     ],
     "rows": [
      {
-      "l": "<p>“Let’s declare PAN PAN and request weather and landing data.”</p>",
-      "r": "<p>“PAN PAN” × 3.<br>“Jeddah Approach, ADEAL 320, flight control failure. Request runway in use, approach type, and weather for a possible return to Jeddah.”</p>",
+      "f": "<p>“Let’s declare PAN PAN and request weather and landing data.”</p>",
       "trig": false
      },
      {
-      "l": "",
-      "r": "<p>Record the information, then confirm legality for the approach.</p>",
+      "f": "<p>“PAN PAN” × 3.<br>“Jeddah Approach, ADEAL 320, flight control failure. Request runway in use, approach type, and weather for a possible return to Jeddah.”</p>",
+      "trig": false
+     },
+     {
+      "f": "<p>Record the information, then confirm legality for the approach.</p>",
       "trig": false
      },
      {
@@ -3324,6 +3295,7 @@ function stepHtml(s,i,isCur){
   if(s.colhd&&s.k!=='img'){const cr=isCrew(s.cols);
     if(cr){const nt=[s.cols[0],s.cols[1]].map(c=>{const m=String(c||'').split(/\n/);return m.length>1?m.slice(1).join(' '):''});
       if(!crewShown||nt[0]||nt[1])h+=`<div class="colhd crew"><div><span class="rk"><i>CA</i><i>CM1</i><i>PF</i></span>${nt[0]?`<span class="nt">${esc(nt[0])}</span>`:''}</div><div><span class="rk"><i>FO</i><i>CM2</i><i>PM</i></span>${nt[1]?`<span class="nt">${esc(nt[1])}</span>`:''}</div></div>`;crewShown=true}
+    else if(s.cols&&s.cols[0]&&!s.cols[1])h+=`<div class="colhd one"><div>${esc(s.cols[0])}</div></div>`;
     else{const [a,b]=roleLabels(s.cols);h+=`<div class="colhd"><div>${esc(a)}</div><div>${esc(b)}</div></div>`}}
   if(!s.h&&s.k==='full'&&!s.l)return h;
   const cur=isCur?' cur':'';
